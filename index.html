@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<title>ZED</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+	<link type="text/css" rel="stylesheet" href="./main.css" />
+	<style>
+		body {
+			/* prevent white margin */
+			margin: 0;
+
+			/* hide scrollbars */
+		}
+
+		a {
+			color: #f00;
+		}
+
+		.ac {
+			/* prevent dat-gui from being selected */
+			-webkit-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+		}
+
+		.no-pointer-events {
+			pointer-events: none;
+		}
+
+		.control-disabled {
+			color: #888;
+			text-decoration: line-through;
+		}
+
+		#logo {
+			position: absolute;
+			top: 20px;
+			left: 20px;
+			visibility: hidden;
+		}
+
+		img {
+			width: 100px;
+			height: auto;
+		}
+
+		#footer {
+			position: absolute;
+			left: 0;
+			bottom: 60px;
+			width: 100%;
+			/* background-color: red; */
+			color: white;
+			text-align: center;
+			visibility: hidden;
+		}
+
+		#vhsFooter {
+			position: absolute;
+			left: 0;
+			bottom: 5px;
+			width: 100%;
+			color: white;
+			text-align: center;
+			visibility: hidden;
+		}
+
+		button {
+			width: 150px;
+			height: 70px;
+			color: white;
+			/* background-color: aqua; */
+			font-size: 30px;
+			/* margin-right: 150px; */
+			background: url(./public/logo/zed_logo_wht.png);
+		}
+
+		video {
+			background-color: rgb(0, 0, 0);
+			position: absolute;
+			width: 100%;
+			height: 100vh;
+			visibility: hidden;
+		}
+
+		#loading-overlay {
+			position: fixed;
+			width: 100%;
+			height: 100%;
+			top: 0px;
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			flex-direction: column;
+			background: black;
+			transition: 1s;
+		}
+
+		.loading-overlay-hidden {
+			display: none !important;
+		}
+
+		#loading-bar {
+			width: 100px;
+			height: 1em;
+			border-radius: 0.25em;
+			background-color: black;
+
+			border: 1px solid grey;
+
+			display: inline-flex;
+		}
+
+		#progress {
+			background-color: white;
+			height: inherit;
+			border-radius: inherit;
+
+			width: 0%;
+		}
+	</style>
+</head>
+
+<body>
+	<!-- <video
+			controll
+			loop
+			src="capture.webm"
+			autoplay="true"
+			muted="muted"
+			id="idleVideo"
+		></video> -->
+	<div id="container"></div>
+	<div id="info">
+		<!-- <img src="logo/zed_logo_wht.png" alt="zed_logo_wht" /> -->
+	</div>
+	<div id="logo">
+		<img src="./public/logo/zed_logo_wht.png" alt="zed_logo_wht" onclick="javascript:onClickLogo()" />
+	</div>
+
+	<div id="loading-overlay">
+		<img src="./public/logo/gallop_white.gif" alt="zed_logo_wht" class="img-logo" />
+		<br />
+		<div id="loading-bar">
+			<span id="progress"></span>
+		</div>
+	</div>
+
+	<div id="footer">
+		<button id="buyButton" onclick="javascript:onClickBuy()">BUY</button>
+		<button id="betButton" onclick="javascript:onClickBet()">BREAD</button>
+		<button id="raceButton" onclick="javascript:onClickRace()">RACE</button>
+	</div>
+	<div id="vhsFooter">
+		<img src="./public/logo/vhs_walking_logo_wht.png" alt="zed_logo_wht" onclick="javascript:onClickVHS()" />
+	</div>
+	<script>
+		function onClickLogo() {
+			window.open('https://zed.run/', '_blank')
+			console.log('Logo Clicked')
+		}
+		function onClickVHS() {
+			window.open('https://zed.run/', '_blank')
+			console.log('Logo Clicked')
+		}
+		function onClickRace() {
+			window.open('https://zed.run/roster', '_blank')
+			console.log('Race button clicked')
+		}
+		function onClickBuy() {
+			window.open('https://zed.run/buy', '_blank')
+			console.log('Buy button clicked')
+		}
+		function onClickBet() {
+			window.open('https://zed.run/stud', '_blank')
+			console.log('Bet Button Clicked')
+		}
+	</script>
+	<script id="vertexShaderRR" type="x-shader/x-vertex">
+
+			precision mediump float;
+			precision mediump int;
+
+			uniform mat4 modelViewMatrix; // optional
+			uniform mat4 projectionMatrix; // optional
+
+			attribute vec3 position;
+			attribute vec4 color;
+
+			varying vec3 vPosition;
+			varying vec4 vColor;
+
+			void main()	{
+
+				vPosition = position;
+				vColor = color;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+			}
+		</script>
+
+	<script id="fragmentShaderRR" type="x-shader/x-fragment">
+
+			precision mediump float;
+			precision mediump int;
+
+			uniform float time;
+
+			varying vec3 vPosition;
+			varying vec4 vColor;
+
+			void main()	{
+
+				vec4 color = vec4( vColor );
+				color.r += sin( vPosition.x * 10.0 + time ) * 0.5;
+
+				gl_FragColor = color;
+
+			}
+		</script>
+	<script id="vertexShader" type="x-shader/x-vertex">
+
+			varying vec2 vUv;
+			#ifdef USE_SKINNING
+				uniform mat4 bindMatrix;
+				uniform mat4 bindMatrixInverse;
+				#ifdef BONE_TEXTURE
+					uniform sampler2D boneTexture;
+					uniform int boneTextureSize;
+					mat4 getBoneMatrix( const in float i ) {
+						float j = i * 4.0;
+						float x = mod( j, float( boneTextureSize ) );
+						float y = floor( j / float( boneTextureSize ) );
+						float dx = 1.0 / float( boneTextureSize );
+						float dy = 1.0 / float( boneTextureSize );
+						y = dy * ( y + 0.5 );
+						vec4 v1 = texture2D( boneTexture, vec2( dx * ( x + 0.5 ), y ) );
+						vec4 v2 = texture2D( boneTexture, vec2( dx * ( x + 1.5 ), y ) );
+						vec4 v3 = texture2D( boneTexture, vec2( dx * ( x + 2.5 ), y ) );
+						vec4 v4 = texture2D( boneTexture, vec2( dx * ( x + 3.5 ), y ) );
+						mat4 bone = mat4( v1, v2, v3, v4 );
+						return bone;
+					}
+				#else
+					uniform mat4 boneMatrices[ MAX_BONES ];
+					mat4 getBoneMatrix( const in float i ) {
+						mat4 bone = boneMatrices[ int(i) ];
+						return bone;
+					}
+				#endif
+			#endif
+			void main() {
+				vUv = uv;
+				#ifdef USE_SKINNING
+					mat4 boneMatX = getBoneMatrix( skinIndex.x );
+					mat4 boneMatY = getBoneMatrix( skinIndex.y );
+					mat4 boneMatZ = getBoneMatrix( skinIndex.z );
+					mat4 boneMatW = getBoneMatrix( skinIndex.w );
+					mat4 skinMatrix = mat4( 0.0 );
+					skinMatrix += skinWeight.x * boneMatX;
+					skinMatrix += skinWeight.y * boneMatY;
+					skinMatrix += skinWeight.z * boneMatZ;
+					skinMatrix += skinWeight.w * boneMatW;
+					skinMatrix  = bindMatrixInverse * skinMatrix * bindMatrix;
+					vec4 skinVertex = bindMatrix * vec4( position, 1.0 );
+					vec4 skinned = vec4( 0.0 );
+					skinned += boneMatX * skinVertex * skinWeight.x;
+					skinned += boneMatY * skinVertex * skinWeight.y;
+					skinned += boneMatZ * skinVertex * skinWeight.z;
+					skinned += boneMatW * skinVertex * skinWeight.w;
+					skinned  = bindMatrixInverse * skinned;
+					vec4 mvPosition = modelViewMatrix * skinned;
+				#else
+					vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+				#endif
+				gl_Position = projectionMatrix * mvPosition;
+			}
+		</script>
+	<script id="fragmentShader111" type="x-shader/x-fragment">
+
+			uniform vec2 resolution;
+			uniform float time;
+			varying vec2 vUv;
+			uniform sampler2D u_helmet_texture;
+			void main() {
+				vec4 color = vec4(1.0,0.3,0.3, 1.0);
+				gl_FragColor = color;
+			}
+		</script>
+	<script id="fragmentShader" type="x-shader/x-fragment">
+
+			uniform vec2 resolution;
+			uniform float time;
+			varying vec2 vUv;
+			uniform sampler2D u_helmet_texture;
+			void main() {
+				vec2 p = -1.0 + 2.0 * vUv;
+				float a = time*30.0;
+				float d,e,f,g=1.0/40.0,h,i,r,q;
+				e=400.0*(p.x*0.5+0.5);
+				f=400.0*(p.y*0.5+0.5);
+				i=200.0+sin(e*g+a/150.0)*20.0;
+				d=200.0+cos(f*g/2.0)*18.0+cos(e*g)*7.0;
+				r=sqrt(pow(i-e,2.0)+pow(d-f,2.0));
+				q=f/r;
+				e=(r*cos(q))-a/2.0;f=(r*sin(q))-a/2.0;
+				d=sin(e*g)*176.0+sin(e*g)*164.0+r;
+				h=((f+d)+a/2.0)*g;
+				i=cos(h+r*p.x/1.3)*(e+e+a)+cos(q*g*6.0)*(r+h/3.0);
+				h=sin(f*g)*144.0-sin(e*g)*212.0*p.x;
+				h=(h+(f-e)*q+sin(r-(a+h)/7.0)*10.0+i/4.0)*g;
+				i+=cos(h*2.3*sin(a/350.0-q))*184.0*sin(q-(r*4.3+a/12.0)*g)+tan(r*g+h)*184.0*cos(r*g+h);
+				i=mod(i/5.6,256.0)/64.0;
+				if(i<0.0) i+=4.0;
+				if(i>=2.0) i=4.0-i;
+				d=r/350.0;
+				d+=sin(d*d*8.0)*0.52;
+				f=(sin(a*g)+1.0)/2.0;
+				vec4 heatmap = vec4(vec3(f*i/1.6,i/2.0+d/13.0,i)*d*p.x+vec3(i/1.3+d/8.0,i/2.0+d/18.0,i)*d*(1.0-p.x),1.0);
+				vec4 helmet = texture2D(u_helmet_texture, vUv);
+				vec4 color =  helmet;
+				if( helmet.x > 0.4 ){
+					color = mix(heatmap, helmet, .70);
+					//color = heatmap;
+				}
+				gl_FragColor = color;
+			}
+		</script>
+	<script id="fragmentShader1" type="x-shader/x-fragment">
+
+			uniform vec2 resolution;
+			uniform float time;
+			varying vec2 vUv;
+			uniform sampler2D u_helmet_texture;
+
+			void main() {
+
+				vec4 helmet = texture2D(u_helmet_texture, vUv);
+				vec4 color = helmet;
+				if( helmet.x > 0.4){
+					vec2 uv = gl_FragCoord.xy / resolution.xy;
+					vec3 col = 0.3*cos(time+uv.xyx+vec3(0,2,4));
+					color = helmet + vec4(vec3(col), 1.0);
+				 	//color = helmet + vec4(vec3(cos(time) + vUv.x, 0.0,0.0 ), 0.4);
+				}
+				gl_FragColor = color;
+			}
+		</script>
+	<script id="fragmentShader2" type="x-shader/x-fragment">
+
+			uniform vec2 resolution;
+			uniform float time;
+			varying vec2 vUv;
+			uniform sampler2D u_helmet_texture;
+
+			void main() {
+
+				vec4 helmet = texture2D(u_helmet_texture, vUv);
+				vec4 color = helmet;
+
+					vec2 uv = gl_FragCoord.xy / resolution.xy;
+					vec3 col = 0.1*cos(time+uv.xyx+vec3(0,2,4));
+					color =helmet +  vec4(vec3(col), 0.5);
+				 	//color = helmet + vec4(vec3(cos(time) + vUv.x, 0.0,0.0 ), 0.4);
+
+				gl_FragColor = color;
+			}
+		</script>
+	<script id="fragmentShader3" type="x-shader/x-fragment">
+
+			uniform vec2 resolution;
+			uniform float time;
+			varying vec2 vUv;
+			uniform sampler2D u_helmet_texture;
+
+			void main() {
+
+				vec4 helmet = texture2D(u_helmet_texture, vUv);
+				vec4 color = helmet;
+
+					vec2 uv = gl_FragCoord.xy / resolution.xy;
+					vec3 col = 0.2*cos(time+uv.xyx+vec3(0,4,8));
+					color =helmet +  vec4(vec3(col), 0.5);
+				 	//color = helmet + vec4(vec3(cos(time) + vUv.x, 0.0,0.0 ), 0.4);
+
+				gl_FragColor = color;
+			}
+		</script>
+	<script id="fragmentShader4" type="x-shader/x-fragment">
+
+			uniform vec2 resolution;
+			uniform float time;
+			varying vec2 vUv;
+			uniform sampler2D u_helmet_texture;
+
+			void main() {
+
+				vec4 helmet = texture2D(u_helmet_texture, vUv);
+				vec4 color = helmet;
+				if( helmet.x > 0.4){
+					vec2 uv = gl_FragCoord.xy / resolution.xy;
+					vec3 col = 0.2*cos(time+uv.xyx+vec3(0,1,2));
+					color =helmet +  vec4(vec3(col), 0.5);
+				 	//color = helmet + vec4(vec3(cos(time) + vUv.x, 0.0,0.0 ), 0.4);
+				}
+				gl_FragColor = color;
+			}
+		</script>
+	<script id="fragmentShader5" type="x-shader/x-fragment">
+
+			uniform vec2 resolution;
+			uniform float time;
+			varying vec2 vUv;
+			uniform sampler2D u_helmet_texture;
+
+			void main() {
+
+				vec4 helmet = texture2D(u_helmet_texture, vUv);
+				vec4 color = helmet;
+				if( helmet.x > 0.4){
+					vec2 uv = gl_FragCoord.xy / resolution.xy;
+					vec3 col = 0.2*cos(time+uv.xyx+vec3(0,1,2));
+					color =helmet +  vec4(vec3(col), 0.5);
+				 	//color = helmet + vec4(vec3(cos(time) + vUv.x, 0.0,0.0 ), 0.4);
+				}
+				gl_FragColor = color;
+			}
+		</script>
+	<script id="fragmentShader6" type="x-shader/x-fragment">
+
+			uniform vec2 resolution;
+			uniform float time;
+			varying vec2 vUv;
+			uniform sampler2D u_helmet_texture;
+
+			void main() {
+
+				vec4 helmet = texture2D(u_helmet_texture, vUv);
+				vec4 color = helmet;
+				if( helmet.y > 0.4){
+					vec2 uv = gl_FragCoord.xy / resolution.xy;
+					vec3 col = 0.1*cos(time+uv.xyx+vec3(0,3,6));
+					color =helmet +  vec4(vec3(col), 0.5);
+				 	//color = helmet + vec4(vec3(cos(time) + vUv.x, 0.0,0.0 ), 0.4);
+				}
+				gl_FragColor = color;
+			}
+		</script>
+	<script id="aura_vertexShader" type="x-shader/x-vertex">
+			attribute vec3 position;
+			attribute vec2 uv;
+
+			uniform mat4 projectionMatrix;
+			uniform mat4 viewMatrix;
+			uniform mat4 modelMatrix;
+
+			varying vec3 vPosition;
+			varying vec2 vUv;
+
+			void main(void) {
+			  // coordinate transformation
+			  vec4 mPosition = modelMatrix * vec4(position, 1.0);
+
+			  vPosition = position;
+			  vUv = uv;
+
+			  gl_Position = projectionMatrix * viewMatrix * mPosition;
+			}
+		</script>
+	<script id="aura_fragmentShader" type="x-shader/x-fragment">
+				precision highp float;
+
+				uniform float time;
+				uniform float alpha;
+				uniform sampler2D outlineTex;
+				uniform sampler2D noiseTex;
+
+				varying vec3 vPosition;
+				varying vec2 vUv;
+
+				const float blurIteration = 8.0;
+
+			//	#pragma glslify: convertHsvToRgb = require(glsl-util/convertHsvToRgb)
+
+				void main() {
+					// calculate blur mask.
+					vec4 destColor = vec4(0.0);
+					for (float i = 0.0; i < blurIteration; i++) {
+						for (float j = 0.0; j < blurIteration; j++) {
+						vec2 p = (vec2(i, j) / blurIteration * 2.0 - 1.0) / 512.0 * 60.0;
+						destColor += texture2D(outlineTex, vUv + p) / pow(blurIteration, 2.0);
+						}
+					}
+					float blurMask = smoothstep(0.0, 0.8, destColor.r) * (1.0 - smoothstep(0.5, 1.0, destColor.r));
+
+					float noise1 = texture2D(noiseTex, vUv + vec2(0.0, time * 0.1 + alpha)).r;
+					float noise2 = texture2D(noiseTex, vUv * 2.0 - vec2(0.0, time * 0.4 + alpha)).g;
+					float noise3 = texture2D(noiseTex, vUv * 3.0 + vec2(0.0, time * 0.8 + alpha)).b;
+					float noise = noise1 * 0.65 + noise2 * 0.3 + noise3 * 0.05;
+
+					float mask = blurMask * pow(smoothstep(0.2, 1.0, noise), 3.0) * 15.0;
+
+					vec3 hsv = vec3(1.0 + mask * 0.5 + alpha, 0.8 - mask * 0.6, 0.5 + mask * 0.5);
+
+					gl_FragColor = vec4(hsv, mask);
+				}
+		</script>
+	<script id="background_vertexShader" type="x-shader/x-fragment">
+			attribute vec3 position;
+			attribute vec2 uv;
+
+			uniform mat4 projectionMatrix;
+			uniform mat4 viewMatrix;
+			uniform mat4 modelMatrix;
+
+			varying vec2 vUv;
+
+			void main(void) {
+				// coordinate transformation
+				vec4 mPosition = modelMatrix * vec4(position, 1.0);
+
+				vUv = uv;
+
+				gl_Position = projectionMatrix * viewMatrix * mPosition;
+			}
+		</script>
+	<script id="background_fragmentShader" type="x-shader/x-fragment">
+				precision highp float;
+
+				uniform float time;
+				uniform float hex;
+
+				varying vec2 vUv;
+				varying vec3 vColor;
+
+			//	#pragma glslify: convertHsvToRgb = require(glsl-util/convertHsvToRgb);
+
+				void main() {
+				  vec3 rgb = mix(
+					vec3(hex, 0.6, 0.6),
+					vec3(hex, 0.4, 0.2),
+					vUv.y * 4.0 - 1.0
+					);
+
+				  gl_FragColor = vec4(rgb, 1.0);
+				}
+		</script>
+
+	<script src="public/bundle.js"></script>
+</body>
+
+</html>
